@@ -1,4 +1,4 @@
-import pyrebase
+import pyrebase, configparser
 
 class Controller:
     config = {
@@ -19,7 +19,13 @@ class Controller:
         print('readConfig')
         auth = self.firebase.auth()
 
-        self.user = auth.sign_in_with_email_and_password("admin@rockettelemetry.com", "pass1234")
+        config = configparser.ConfigParser()
+        config.read('defaults.cfg')
+
+        username = config.get('auth', 'username')
+        password = config.get('auth', 'password')
+
+        self.user = auth.sign_in_with_email_and_password(username, password)
 
         db = self.firebase.database()
 
