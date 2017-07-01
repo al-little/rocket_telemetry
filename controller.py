@@ -1,7 +1,10 @@
+''' Controller runs commands
+
+'''
 import pyrebase
 import configparser
 
-class Controller:
+class Controller(object):
     config = {
         "apiKey": "AIzaSyD3nhZRJOMruxzpsWkYIKX9BCN-A4i-LGI",
         "authDomain": "rocket-telemetry.firebaseapp.com",
@@ -9,32 +12,33 @@ class Controller:
         "storageBucket": "rocket-telemetry.appspot.com"
     }
 
-    running = True  # Main loop
-    user = None  # Required to execute firebase commands
-    firebase = None
-    db = None
-    sampleInterval = 250  # Default sample interval
-    sendInterval = 5000  # Default send interval
-
     def __init__(self):
-        print('Init Controller')
+        'Initialise the firebase instance and read the config'
+        self.running = True  # Main loop
+        self.user = None  # Required to execute firebase commands
+        self.firebase = None
+        self.db = None
+        self.sampleInterval = 2500  # Default sample interval
+        self.sendInterval = 5000  # Default send interval
+
         self.firebase = pyrebase.initialize_app(self.config)
         self.readconfig()
 
     def readconfig(self):
+        'Read the configuration information from firebase'
         auth = self.firebase.auth()
         config = configparser.ConfigParser()
 
-        "Read the firebase configuration information"
+        # Read the firebase configuration information
         config.read('defaults.cfg')
         username = config.get('auth', 'username')
         password = config.get('auth', 'password')
 
-        "Sign into firebase, to allow reads and writes"
+        # Sign into firebase, to allow reads and writes
         self.user = auth.sign_in_with_email_and_password(username, password)
         self.db = self.firebase.database()
 
-        "Read the device information"
+        # Read the device information
         result = self.db.child('device_info').get(self.user['idToken'])
         results = result.val()
 
@@ -47,16 +51,17 @@ class Controller:
         return False
 
     def run(self):
+        'Main run loop that processes commands and records sensor data'
         print('Running...')
         sampleCount = 0
-        "Get sensors"
+        # Get sensors
 
-        "Find settings"
+        # Find settings
 
         while self.running:
             if self.readcommand():
                 print('Processing command...')
-                "Update firebase if the device mode changes"
+                # Update firebase if the device mode changes
 
             print("Collecting samples..." + str(sampleCount))
 
