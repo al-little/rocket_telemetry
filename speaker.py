@@ -3,6 +3,7 @@
 '''
 from control import Control
 from device_status import DeviceStatus
+
 import sn3218
 
 class Speaker(Control):
@@ -30,9 +31,8 @@ class Speaker(Control):
     def alarm(self):
         'Start the speaker and lights'
         # Also start the lights
-        led_values = range(10)
-        sn3218.output(on_mappings)
+        sn3218.output(Speaker.on_mappings)
 
     def stop_alarm(self):
         'Stop the speaker and lights'
-        sn3218.output(off_mappings)
+        sn3218.output(Speaker.off_mappings)
