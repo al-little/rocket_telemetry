@@ -1,6 +1,9 @@
-import Controller
+''' The Controller
 
-controller = Controller.Controller()
+'''
+import controller
+
+controller = controller.Controller()
 
 controller.run()
 
