@@ -1,4 +1,4 @@
-''' Start the controller and allow commands to be sent via the command line.
+''' The Controller
 
 '''
 import controller
@@ -6,3 +6,11 @@ import controller
 controller = controller.Controller()
 
 controller.run()
+
+while True:
+    # ctrl-c to quit
+    cmd = input('telemetry cmd$ ')
+
+    controller.commands.append(cmd)
+
+    print('execute: ' + cmd)
