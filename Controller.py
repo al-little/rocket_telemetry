@@ -13,14 +13,30 @@ class Controller:
     user = None  # Required to execute firebase commands
     firebase = None
     db = None
+
+    "Capabilites to be read from the configuration file"
+    hasSpeaker = False
+    hasLights = False
+    hasCamera = False
+    hasEnviro = False
+    has2G = False
+    has3G = False
+    hasGPS = False
+
     sampleInterval = 250  # Default sample interval
     sendInterval = 5000  # Default send interval
+    commands = []
+
 
     def __init__(self):
         print('Init Controller')
         self.firebase = pyrebase.initialize_app(self.config)
         self.readconfig()
 
+    """readConfig looks at the defaults.cfg file.
+    If a Fona board is present then initialise it and detect if we have 3G
+    GPS?
+    """
     def readconfig(self):
         auth = self.firebase.auth()
         config = configparser.ConfigParser()
@@ -30,26 +46,56 @@ class Controller:
         username = config.get('auth', 'username')
         password = config.get('auth', 'password')
 
-        "Sign into firebase, to allow reads and writes"
-        self.user = auth.sign_in_with_email_and_password(username, password)
-        self.db = self.firebase.database()
+        "Read the physically installed inputs and outputs"
+        if config.has_option(section='outputs', option='speaker'):
+            self.hasSpeaker = True
 
-        "Read the device information"
-        result = self.db.child('device_info').get(self.user['idToken'])
-        results = result.val()
+        if config.has_option(section='outputs', option='lights'):
+            self.hasLights = True
 
-        print(results)
+        if config.has_option(section='inputs', option='enviro'):
+            self.hasEnviro = True
 
-        self.sendInterval = results['send_interval']
-        self.sampleInterval = results['sample_interval']
+        if config.has_option(section='outputs', option='fona'):
+            self.has2G = True
+
+        if self.has2G:
+            "Now need to initialise the modem"
+            "Ultimately the self.has3G needs to be set"
+
+        if self.has3G and len(username) > 0 and len(password) > 0:
+            "Sign into firebase, to allow reads and writes"
+            self.user = auth.sign_in_with_email_and_password(username, password)
+            self.db = self.firebase.database()
+
+            "Read the device information"
+            result = self.db.child('device_info').get(self.user['idToken'])
+            results = result.val()
+
+            print(results)
+
+            self.sendInterval = results['send_interval']
+            self.sampleInterval = results['sample_interval']
+
+            "self.fileFormat = results['file_fmt']"
+            "self.smsNumber = results['tel']"
+
+            "TODO: The camera is capable of annotating text onto the video"
+            "Flexible format (new file/telemetry dir || date || time || cool name)"
+
 
     def readcommand(self):
+        cmd = self.commands.pop()
+
+        print(cmd)
+
         return False
+
 
     def run(self):
         print('Running...')
         sampleCount = 0
-        "Get sensors"
+        "Get installed sensors"
 
         "Find settings"
 
@@ -57,11 +103,28 @@ class Controller:
             if self.readcommand():
                 print('Processing command...')
                 "Update firebase if the device mode changes"
+                "Play noise/Update lights to reflect state"
+                "Start new session"
+                "   Create a new directory ready for data"
+                "Stop current session"
 
             print("Collecting samples..." + str(sampleCount))
 
+            if self.hasEnviro:
+                "Collect a set of environment values"
+                "TODO: Stub"
+
+            if self.hasGPS:
+                "Collect a set of GPS coordinates"
+                "TODO: Stub"
+
             sampleCount = sampleCount + self.sampleInterval
 
+            print('[Save samples]')
+
             if sampleCount >= self.sendInterval:
-                print('[Send samples]')
+
+                if self.has3G:
+                    print('[Send samples]')
+
                 sampleCount = 0
