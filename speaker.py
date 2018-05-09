@@ -36,3 +36,9 @@ class Speaker(Control):
     def stop_alarm(self):
         'Stop the speaker and lights'
         sn3218.output(Speaker.off_mappings)
+
+    'Power light'
+
+    'Logging Light'
+
+    'Camera light'

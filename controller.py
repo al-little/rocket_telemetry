@@ -12,6 +12,9 @@ class Controller(object):
         "storageBucket": "rocket-telemetry.appspot.com"
     }
 
+    "Adding an on and off button"
+    "https://grahamwhome.wixsite.com/tetchytechie/single-post/2018/01/10/A-working-Raspberry-Pi-3-power-button"
+    "http://www.raspberry-pi-geek.com/Archive/2013/01/Adding-an-On-Off-switch-to-your-Raspberry-Pi"
     running = True  # Main loop
     user = None  # Required to execute firebase commands
     firebase = None
@@ -29,7 +32,6 @@ class Controller(object):
     sampleInterval = 250  # Default sample interval
     sendInterval = 5000  # Default send interval
     commands = []
-
 
     def __init__(self):
         'Initialise the firebase instance and read the config'
@@ -94,13 +96,45 @@ class Controller(object):
             "TODO: The camera is capable of annotating text onto the video"
             "Flexible format (new file/telemetry dir || date || time || cool name)"
 
-
     def readcommand(self):
-        cmd = self.commands.pop()
 
-        print(cmd)
+        while len(self.commands) > 0:
+            "Update firebase if the device mode changes"
+            "Play noise/Update lights to reflect state"
+            "Start new session"
+            "   Create a new directory ready for data"
+            "Stop current session"
+            command = self.commands.pop()
 
-        return False
+            print('Processing command: [' + command + ']')
+
+            if len(command) > 0:
+                object = command[0]
+
+                if object == 'C':
+                    print('Camera')
+                elif object == 'S':
+                    print('Speaker')
+                elif object == 'E':
+                    print('Enviro')
+                elif object == 'A':
+                    print('All')
+                    if len(command) > 1:
+                        cmd = command[1]
+
+                        if cmd == '1':
+                            print('All on')
+                            "Collect samples, start video"
+                        else:
+                            print('All off')
+                elif object == '0':
+                    print('System message')
+                    "Reset, Shutdown"
+                    "os.system('sudo shutdown -h now')"
+
+                "Either acknowledge or update firebase"
+
+                "Process: C - Camera, S - Speaker, E - Enviro, A - All"
 
 
     def run(self):
@@ -111,13 +145,9 @@ class Controller(object):
         "Get installed sensors"
 
         while self.running:
-            if self.readcommand():
-                print('Processing command...')
-                "Update firebase if the device mode changes"
-                "Play noise/Update lights to reflect state"
-                "Start new session"
-                "   Create a new directory ready for data"
-                "Stop current session"
+            self.commands.append(input("Prompt>"))
+
+            self.readcommand()
 
             print("Collecting samples..." + str(sampleCount))
 
