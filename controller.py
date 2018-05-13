@@ -3,6 +3,10 @@
 '''
 import pyrebase
 import configparser
+import datetime
+import time
+import random
+from camera import Camera, CameraCommand
 
 class Controller(object):
     config = {
@@ -19,6 +23,7 @@ class Controller(object):
     user = None  # Required to execute firebase commands
     firebase = None
     db = None
+    log_path = ''
 
     "Capabilites to be read from the configuration file"
     hasSpeaker = False
@@ -29,9 +34,14 @@ class Controller(object):
     has3G = False
     hasGPS = False
 
-    sampleInterval = 250  # Default sample interval
+    sampleInterval = 0.250  # Default sample interval
     sendInterval = 5000  # Default send interval
     commands = []
+
+    image_path = ''
+    video_path = ''
+    telemetry_path = ''
+    camera = Camera('PI Camera')
 
     def __init__(self):
         'Initialise the firebase instance and read the config'
@@ -39,7 +49,7 @@ class Controller(object):
         self.user = None  # Required to execute firebase commands
         self.firebase = None
         self.db = None
-        self.sampleInterval = 2500  # Default sample interval
+        self.sampleInterval = 0.250  # Default sample interval
         self.sendInterval = 5000  # Default send interval
 
         self.firebase = pyrebase.initialize_app(self.config)
@@ -71,6 +81,7 @@ class Controller(object):
 
         if config.has_option(section='outputs', option='fona'):
             self.has2G = True
+            self.hasGPS = True
 
         if self.has2G:
             "Now need to initialise the modem"
@@ -109,10 +120,22 @@ class Controller(object):
             print('Processing command: [' + command + ']')
 
             if len(command) > 0:
-                object = command[0]
+                object = command[0].upper()
 
                 if object == 'C':
-                    print('Camera')
+                    if len(command) > 1:
+                        try:
+                            cmd = CameraCommand(int(command[1]))
+
+                            if cmd == CameraCommand.STILL_PHOTO:
+                                self.camera.take_picture(self.image_path)
+                            elif cmd == CameraCommand.START_VIDEO:
+                                self.camera.start_video(self.video_path)
+                            elif cmd == CameraCommand.STOP_VIDEO:
+                                self.camera.stop_video()
+                            break
+                        except ValueError:
+                            print('Unrecognised Camera Command')
                 elif object == 'S':
                     print('Speaker')
                 elif object == 'E':
@@ -140,32 +163,56 @@ class Controller(object):
     def run(self):
         'Main run loop that processes commands and records sensor data'
         print('Running...')
-        sampleCount = 0
+        path = self.log_path + 'log_' + str(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")) + '.csv'
 
-        "Get installed sensors"
+        log = open(path, "a")
+
+        'initial altitude'
+        sea_level = 100
+        altitude = 100
+        last_altitude = 0
+        accel_x = 0
+        accel_y = 0
+        accel_z = 0
+        gps_lat = 0.0
+        gps_lon = 0.0
 
         while self.running:
             self.commands.append(input("Prompt>"))
 
             self.readcommand()
 
-            print("Collecting samples..." + str(sampleCount))
-
             if self.hasEnviro:
                 "Collect a set of environment values"
                 "TODO: Stub"
+                altitude = random.randrange(100, 1000, 2)
+                accel_x = random.random()
+                accel_y = random.random()
+                accel_z = random.random()
 
             if self.hasGPS:
                 "Collect a set of GPS coordinates"
                 "TODO: Stub"
+                gps_lat = random.random()
+                gps_lon = random.random()
 
-            sampleCount = sampleCount + self.sampleInterval
+            try:
+                log.write("{0},{1},{2},{3},{4},{5},{6}\n".format(datetime.datetime.utcnow(),
+                                                                  str(altitude),
+                                                                  str(accel_x),
+                                                                  str(accel_y),
+                                                                  str(accel_z),
+                                                                  str(gps_lat),
+                                                                  str(gps_lon)))
+            except:
+                print('logging failed')
 
-            print('[Save samples]')
+            if last_altitude < altitude:
+                print('Apogee')
 
-            if sampleCount >= self.sendInterval:
+            last_altitude = altitude
+            time.sleep(self.sampleInterval)
 
-                if self.has3G:
-                    print('[Send samples]')
+            log.flush()
 
-                sampleCount = 0
+            'Every minute, send the GPS'

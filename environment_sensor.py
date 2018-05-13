@@ -8,6 +8,7 @@ class EnvironmentSensor(object):
     last_temperature = 0.0
     last_pressure = 0.0
     sea_level_pressure = 0.0
+    last_altitude = 0.0
 
     def __init__(self, sensor_name):
         self.status = DeviceStatus.READY
@@ -18,8 +19,9 @@ class EnvironmentSensor(object):
         x, y, z = motion.accelerometer()
         self.last_temperature = weather.temperature()
         self.last_pressure = weather.pressure()
+        self.last_altitude = weather.altitude()
 
-        return x, y, z, self.last_temperature, self.last_pressure
+        return x, y, z, self.last_temperature, self.last_pressure, self.last_altitude
 
     def set_sea_level(self, pressure):
         self.sea_level_pressure = pressure
