@@ -113,7 +113,7 @@ class Controller(object):
             self.commands.append(input("Command >"))
             self.readcommand()
 
-            altitude = weather.altitued()
+            altitude = weather.altitude()
 
             if sea_level == 0:
                 sea_level = altitude
