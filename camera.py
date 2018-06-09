@@ -24,7 +24,7 @@ class Camera(object):
 
     def take_picture(self, image_path):
         self.status = CameraCommand.STILL_PHOTO
-        path = image_path + image_path + 'image_' + str(datetime.datetime.utcnow()) +'.jpg'
+        path = image_path + 'image_' + str(datetime.datetime.utcnow()) +'.jpg'
         # Take a picture. A path is required, excluding filename.
         self.camera.capture(path)
         print('Camera: take picture ' + path)
@@ -32,7 +32,7 @@ class Camera(object):
     def start_video(self, video_path):
         if self.status != CameraCommand.START_VIDEO:
             self.status = CameraCommand.START_VIDEO
-            path = video_path + video_path + 'video_' + str(datetime.datetime.utcnow()) + '.h264'
+            path = video_path + 'video_' + str(datetime.datetime.utcnow()) + '.h264'
             # Start a video recording. A path is required, excluding filename.
             self.camera.start_recording(video_path + 'video_{timestamp:%H-%M-%S-%f}.h264')
             print('Camera: Start recording ' + path)
