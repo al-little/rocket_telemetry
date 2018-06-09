@@ -1,58 +1,31 @@
 ''' Controller runs commands
 
 '''
-import pyrebase
+import os
 import configparser
 import datetime
 import time
 import random
+from envirophat import motion, weather
 from camera import Camera, CameraCommand
 
 class Controller(object):
-    config = {
-        "apiKey": "AIzaSyD3nhZRJOMruxzpsWkYIKX9BCN-A4i-LGI",
-        "authDomain": "rocket-telemetry.firebaseapp.com",
-        "databaseURL": "https://rocket-telemetry.firebaseio.com/",
-        "storageBucket": "rocket-telemetry.appspot.com"
-    }
-
     "Adding an on and off button"
     "https://grahamwhome.wixsite.com/tetchytechie/single-post/2018/01/10/A-working-Raspberry-Pi-3-power-button"
     "http://www.raspberry-pi-geek.com/Archive/2013/01/Adding-an-On-Off-switch-to-your-Raspberry-Pi"
     running = True  # Main loop
-    user = None  # Required to execute firebase commands
-    firebase = None
-    db = None
     log_path = ''
 
-    "Capabilites to be read from the configuration file"
-    hasSpeaker = False
-    hasLights = False
-    hasCamera = False
-    hasEnviro = False
-    has2G = False
-    has3G = False
-    hasGPS = False
-
-    sampleInterval = 0.250  # Default sample interval
+    sampleInterval = 0.100  # Default sample interval
     sendInterval = 5000  # Default send interval
     commands = []
-
     image_path = ''
     video_path = ''
-    telemetry_path = ''
     camera = Camera('PI Camera')
 
     def __init__(self):
         'Initialise the firebase instance and read the config'
         self.running = True  # Main loop
-        self.user = None  # Required to execute firebase commands
-        self.firebase = None
-        self.db = None
-        self.sampleInterval = 0.250  # Default sample interval
-        self.sendInterval = 5000  # Default send interval
-
-        self.firebase = pyrebase.initialize_app(self.config)
         self.readconfig()
 
     """readConfig looks at the defaults.cfg file.
@@ -61,54 +34,15 @@ class Controller(object):
     """
     def readconfig(self):
         'Read the configuration information from firebase'
-        auth = self.firebase.auth()
         config = configparser.ConfigParser()
 
         # Read the firebase configuration information
         config.read('defaults.cfg')
-        username = config.get('auth', 'username')
-        password = config.get('auth', 'password')
-
-        "Read the physically installed inputs and outputs"
-        if config.has_option(section='outputs', option='speaker'):
-            self.hasSpeaker = True
-
-        if config.has_option(section='outputs', option='lights'):
-            self.hasLights = True
-
-        if config.has_option(section='inputs', option='enviro'):
-            self.hasEnviro = True
-
-        if config.has_option(section='outputs', option='fona'):
-            self.has2G = True
-            self.hasGPS = True
-
-        if self.has2G:
-            "Now need to initialise the modem"
-            "Ultimately the self.has3G needs to be set"
-
-        if self.has3G and len(username) > 0 and len(password) > 0:
-            "Sign into firebase, to allow reads and writes"
-            self.user = auth.sign_in_with_email_and_password(username, password)
-            self.db = self.firebase.database()
-
-            "Read the device information"
-            result = self.db.child('device_info').get(self.user['idToken'])
-            results = result.val()
-
-            print(results)
-
-            self.sendInterval = results['send_interval']
-            self.sampleInterval = results['sample_interval']
-
-            "self.fileFormat = results['file_fmt']"
-            "self.smsNumber = results['tel']"
-
-            "TODO: The camera is capable of annotating text onto the video"
-            "Flexible format (new file/telemetry dir || date || time || cool name)"
+        self.image_path = config.get('paths', 'image_path')
+        self.video_path = config.get('paths', 'video_path')
+        self.log_path = config.get('paths', 'log_path')
 
     def readcommand(self):
-
         while len(self.commands) > 0:
             "Update firebase if the device mode changes"
             "Play noise/Update lights to reflect state"
@@ -153,7 +87,7 @@ class Controller(object):
                 elif object == '0':
                     print('System message')
                     "Reset, Shutdown"
-                    "os.system('sudo shutdown -h now')"
+                    os.system('sudo shutdown -h now')
 
                 "Either acknowledge or update firebase"
 
@@ -168,42 +102,34 @@ class Controller(object):
         log = open(path, "a")
 
         'initial altitude'
-        sea_level = 100
-        altitude = 100
+        sea_level = 0
+        altitude = 0
         last_altitude = 0
         accel_x = 0
         accel_y = 0
         accel_z = 0
-        gps_lat = 0.0
-        gps_lon = 0.0
 
         while self.running:
-            self.commands.append(input("Prompt>"))
-
+            self.commands.append(input("Command >"))
             self.readcommand()
 
-            if self.hasEnviro:
-                "Collect a set of environment values"
-                "TODO: Stub"
-                altitude = random.randrange(100, 1000, 2)
-                accel_x = random.random()
-                accel_y = random.random()
-                accel_z = random.random()
+            altitude = weather.altitued()
 
-            if self.hasGPS:
-                "Collect a set of GPS coordinates"
-                "TODO: Stub"
-                gps_lat = random.random()
-                gps_lon = random.random()
+            if sea_level == 0:
+                sea_level = altitude
+
+            acc_values = [round(x, 2) for x in motion.accelerometer()]
+
+            accel_x = acc_values[0]
+            accel_y = acc_values[1]
+            accel_z = acc_values[2]
 
             try:
-                log.write("{0},{1},{2},{3},{4},{5},{6}\n".format(datetime.datetime.utcnow(),
-                                                                  str(altitude),
-                                                                  str(accel_x),
-                                                                  str(accel_y),
-                                                                  str(accel_z),
-                                                                  str(gps_lat),
-                                                                  str(gps_lon)))
+                log.write("{0},{1},{2},{3},{4}\n".format(datetime.datetime.utcnow(),
+                                                         str(altitude - sea_level),
+                                                         str(accel_x),
+                                                         str(accel_y),
+                                                         str(accel_z)))
             except:
                 print('logging failed')
 
@@ -214,5 +140,3 @@ class Controller(object):
             time.sleep(self.sampleInterval)
 
             log.flush()
-
-            'Every minute, send the GPS'
