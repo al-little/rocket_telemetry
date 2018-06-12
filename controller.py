@@ -10,15 +10,11 @@ from envirophat import motion, weather
 from camera import Camera, CameraCommand
 
 class Controller(object):
-    "Adding an on and off button"
-    "https://grahamwhome.wixsite.com/tetchytechie/single-post/2018/01/10/A-working-Raspberry-Pi-3-power-button"
-    "http://www.raspberry-pi-geek.com/Archive/2013/01/Adding-an-On-Off-switch-to-your-Raspberry-Pi"
     running = True  # Main loop
-    log_path = ''
-
     sampleInterval = 0.100  # Default sample interval
-    sendInterval = 5000  # Default send interval
+    cutoffTime = 5 * 60  # Time to run before stopping program
     commands = []
+    log_path = ''
     image_path = ''
     video_path = ''
     camera = Camera('PI Camera')
@@ -93,7 +89,11 @@ class Controller(object):
 
                 "Process: C - Camera, S - Speaker, E - Enviro, A - All"
 
-
+    '''
+    Design:
+    Start timer: once the difference in altitude reaches 10 metres.
+        Timer should probably run for 3 minutes to capture a flight.
+    '''
     def run(self):
         'Main run loop that processes commands and records sensor data'
         print('Running...')
@@ -102,24 +102,19 @@ class Controller(object):
         log = open(path, "a")
 
         'initial altitude'
-        sea_level = 0
-        altitude = 0
+        sea_level = weather.altitude()
         last_altitude = 0
-        accel_x = 0
-        accel_y = 0
-        accel_z = 0
+        start_clock = False
+        parachute_deployed = False
+        hit_apogee = False
+        timer = 0
 
         while self.running:
             self.commands.append(input("Command >"))
             self.readcommand()
 
             altitude = weather.altitude()
-
-            if sea_level == 0:
-                sea_level = altitude
-
             acc_values = [round(x, 2) for x in motion.accelerometer()]
-
             accel_x = acc_values[0]
             accel_y = acc_values[1]
             accel_z = acc_values[2]
@@ -133,10 +128,27 @@ class Controller(object):
             except:
                 print('logging failed')
 
-            if last_altitude < altitude:
+            if altitude - sea_level > 10:
+                start_clock = True
+
+            # If the height is greater than 10m then start running this check.
+            if not hit_apogee and last_altitude < altitude and start_clock:
+                hit_apogee = True
                 print('Apogee')
+
+            if altitude <= 90 and not parachute_deployed:
+                parachute_deployed = True
+                print('Deploy parachute')
 
             last_altitude = altitude
             time.sleep(self.sampleInterval)
 
             log.flush()
+
+            if start_clock:
+                timer += self.sampleInterval
+
+                if timer > self.cutoffTime:
+                    self.camera.stop_video()
+                    log.close()
+                    self.running = False
