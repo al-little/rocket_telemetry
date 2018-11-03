@@ -61,8 +61,8 @@ class Controller(object):
         self.video_path = config.get('paths', 'video_path')
         self.log_path = config.get('paths', 'log_path')
 
-        self.camera_present = config.get('devices', 'camera')
-        self.enviro_present = config.get('devices', 'enviro')
+        self.camera_present = config.getboolean('devices', 'camera')
+        self.enviro_present = config.getboolean('devices', 'enviro')
 
     '''
     Design:
