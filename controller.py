@@ -5,7 +5,7 @@ import os
 import configparser
 import datetime
 import time
-import random
+import signal
 from envirophat import motion, weather
 from camera import Camera, CameraCommand
 
@@ -18,11 +18,27 @@ class Controller(object):
     image_path = ''
     video_path = ''
     camera = Camera('PI Camera')
+    global log_file
 
     def __init__(self):
         'Initialise the firebase instance and read the config'
         self.running = True  # Main loop
         self.readconfig()
+
+        path = self.log_path + 'log_' + str(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")) + '.csv'
+
+        self.log_file = open(path, "a")
+
+        signal.signal(signal.SIGTERM, self.stop)
+        signal.signal(signal.SIGHUP, self.ignore)
+
+    def stop(self, sig, frame):
+        print('System shutdown')
+        self.camera.stop_video()
+        log_file.close()
+
+    def ignore(self, sig, frame):
+        print('ignoring signal %d\n' % sig)
 
     """readConfig looks at the defaults.cfg file.
     If a Fona board is present then initialise it and detect if we have 3G
@@ -80,10 +96,6 @@ class Controller(object):
                             "Collect samples, start video"
                         else:
                             print('All off')
-                elif object == '0':
-                    print('System message')
-                    "Reset, Shutdown"
-                    os.system('sudo shutdown -h now')
 
                 "Either acknowledge or update firebase"
 
@@ -97,9 +109,6 @@ class Controller(object):
     def run(self):
         'Main run loop that processes commands and records sensor data'
         print('Running...')
-        path = self.log_path + 'log_' + str(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")) + '.csv'
-
-        log = open(path, "a")
 
         'initial altitude'
         sea_level = weather.altitude()
@@ -120,11 +129,11 @@ class Controller(object):
             accel_z = acc_values[2]
 
             try:
-                log.write("{0},{1},{2},{3},{4}\n".format(datetime.datetime.utcnow(),
-                                                         str(altitude - sea_level),
-                                                         str(accel_x),
-                                                         str(accel_y),
-                                                         str(accel_z)))
+                self.log_file.write("{0},{1},{2},{3},{4}\n".format(datetime.datetime.utcnow(),
+                                                                   str(altitude - sea_level),
+                                                                   str(accel_x),
+                                                                   str(accel_y),
+                                                                   str(accel_z)))
             except:
                 print('logging failed')
 
@@ -143,12 +152,12 @@ class Controller(object):
             last_altitude = altitude
             time.sleep(self.sampleInterval)
 
-            log.flush()
+            self.log_file.flush()
 
             if start_clock:
                 timer += self.sampleInterval
 
                 if timer > self.cutoffTime:
                     self.camera.stop_video()
-                    log.close()
+                    log_file.close()
                     self.running = False
