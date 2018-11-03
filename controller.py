@@ -32,6 +32,11 @@ class Controller(object):
         self.log_file = open(path, "a")
         self.log_file.write("Starting telemetry {0}\n".format(datetime.datetime.utcnow()))
 
+
+        if self.camera_present:
+            self.log_file.write("Starting camera {0}\n".format(datetime.datetime.utcnow()))
+            self.camera = Camera('PI Camera')
+
         signal.signal(signal.SIGTERM, self.stop)
         signal.signal(signal.SIGHUP, self.ignore)
 
@@ -58,10 +63,6 @@ class Controller(object):
 
         self.camera_present = config.get('devices', 'camera')
         self.enviro_present = config.get('devices', 'enviro')
-
-        if self.camera_present:
-            self.log_file.write("Starting camera {0}\n".format(datetime.datetime.utcnow()))
-            self.camera = Camera('PI Camera')
 
     '''
     Design:
