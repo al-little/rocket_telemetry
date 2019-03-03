@@ -2,8 +2,14 @@
 
 You will need to create default.cfg
 
-[auth]
-username=???
-password=???
+[paths]
+image_path=???
+video_path=???
+log_path=???
 
-This will allow you access to the firebase repository
+[devices]
+camera=true
+enviro=false
+
+To start
+python3 process.py
