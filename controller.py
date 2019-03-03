@@ -34,7 +34,7 @@ class Controller(object):
 
 
         if self.camera_present:
-            self.log_file.write("Starting camera {0}\n".format(datetime.datetime.utcnow()))
+            self.log_file.write("Starting camera    {0}\n".format(datetime.datetime.utcnow()))
             self.camera = Camera('PI Camera')
 
         signal.signal(signal.SIGTERM, self.stop)
@@ -72,17 +72,19 @@ class Controller(object):
     def run(self):
         'Main run loop that processes commands and records sensor data'
         print('Running...')
+        self.log_file.write("=============================================\n")
 
         self.log_file.write("Starting main loop {0}\n".format(datetime.datetime.utcnow()))
 
         if self.camera_present:
             self.camera.start_video(self.video_path)
 
-        'initial altitude'
         if self.enviro_present:
             sea_level = weather.altitude()
         else:
             sea_level = 0
+
+        self.log_file.write("Sea level          {0}\n".format(sea_level))
 
         last_altitude = 0
         start_clock = False
@@ -90,33 +92,36 @@ class Controller(object):
         hit_apogee = False
         timer = 0
 
+        self.log_file.write("=============================================\n")
+        self.log_file.write("time,altitude,accel_x,accel_y,accel_z\n")
+
         while self.running:
             if self.enviro_present:
                 altitude = weather.altitude()
                 acc_values = [round(x, 2) for x in motion.accelerometer()]
-                accel_x = acc_values[0]
-                accel_y = acc_values[1]
-                accel_z = acc_values[2]
 
                 try:
                     self.log_file.write("{0},{1},{2},{3},{4}\n".format(datetime.datetime.utcnow(),
                                                                        str(altitude - sea_level),
-                                                                       str(accel_x),
-                                                                       str(accel_y),
-                                                                       str(accel_z)))
+                                                                       str(acc_values[0]),
+                                                                       str(acc_values[1]),
+                                                                       str(acc_values[2])))
                     self.log_file.flush()
                 except:
                     print('logging failed')
 
+                # Start the clock once we pass 10 metres
                 if altitude - sea_level > 10:
                     start_clock = True
 
                 # If the height is greater than 10m then start running this check.
                 if not hit_apogee and last_altitude < altitude and start_clock:
+                    # Our maximum altitude
                     hit_apogee = True
                     print('Apogee')
 
-                if altitude <= 90 and not parachute_deployed:
+                # Returning to earth...
+                if hit_apogee and altitude <= 90 and not parachute_deployed:
                     parachute_deployed = True
                     print('Deploy parachute')
 
