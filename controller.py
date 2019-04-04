@@ -1,6 +1,3 @@
-''' Controller runs commands
-
-'''
 import os
 import configparser
 import datetime
@@ -12,7 +9,7 @@ from camera import Camera, CameraCommand
 class Controller(object):
     running = True  # Main loop
     sampleInterval = 0.100  # Default sample interval
-    cutoffTime = 5 * 60  # Time to run before stopping program
+    cutoffTime = 1 * 60  # Time to run before stopping program
     commands = []
     log_path = ''
     image_path = ''
@@ -111,7 +108,8 @@ class Controller(object):
                     print('logging failed')
 
                 # Start the clock once we pass 10 metres
-                if altitude - sea_level > 10:
+                if start_clock == False and altitude - sea_level > 3:
+                    print('Starting clock')
                     start_clock = True
 
                 # If the height is greater than 10m then start running this check.
@@ -131,6 +129,8 @@ class Controller(object):
 
             if start_clock:
                 timer += self.sampleInterval
+
+                print('Timer: ' + str(timer) + ' of ' + str(self.cutoffTime))
 
                 if timer > self.cutoffTime:
                     if self.camera_present:

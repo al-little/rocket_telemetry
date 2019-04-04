@@ -40,5 +40,6 @@ class Camera(object):
     def stop_video(self):
         self.status = CameraCommand.STOP_VIDEO
         # Stop the current recording
+        # self.camera.resolution = 640, 480
         self.camera.stop_recording()
         print('Camera: Stop recording')
