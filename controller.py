@@ -4,13 +4,15 @@ import datetime
 import time
 import signal
 from envirophat import motion, weather
-from camera import Camera, CameraCommand
+from camera import Camera
+
 
 class Controller(object):
-    running = True  # Main loop
+    running = True
     sampleInterval = 0.100  # Default sample interval
     cutoffTime = 1 * 60  # Time to run before stopping program
-    commands = []
+    safe_start_altitude = 3.0  # Altitude where the shutdown timer starts
+    parachute_deply_altitude = 90  # Altitude to deploy the secondary parachute
     log_path = ''
     image_path = ''
     video_path = ''
@@ -20,18 +22,22 @@ class Controller(object):
     global camera
 
     def __init__(self):
-        'Initialise the firebase instance and read the config'
+        'Read the config'
         self.running = True  # Main loop
         self.readconfig()
 
         path = self.log_path + 'log_' + str(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")) + '.csv'
 
         self.log_file = open(path, "a")
-        self.log_file.write("Starting telemetry {0}\n".format(datetime.datetime.utcnow()))
-
+        self.log_file.write("=============================================\n")
+        self.log_file.write("{0} image_path {1}\n".format(datetime.datetime.utcnow(), self.image_path))
+        self.log_file.write("{0} video_path {1}\n".format(datetime.datetime.utcnow(), self.video_path))
+        self.log_file.write("{0} log_path {1}\n".format(datetime.datetime.utcnow(), self.log_path))
+        self.log_file.write("{0} Camera present {1}}\n".format(datetime.datetime.utcnow(), self.camera_present))
+        self.log_file.write("{0} Enviro present {1}}\n".format(datetime.datetime.utcnow(), self.enviro_present))
 
         if self.camera_present:
-            self.log_file.write("Starting camera    {0}\n".format(datetime.datetime.utcnow()))
+            self.log_file.write("{0} Starting camera\n".format(datetime.datetime.utcnow()))
             self.camera = Camera('PI Camera')
 
         signal.signal(signal.SIGTERM, self.stop)
@@ -41,13 +47,13 @@ class Controller(object):
     def stop(self, sig, frame):
         print('System shutdown')
         self.camera.stop_video()
-        self.log_file.write("System shutdown {0}\n".format(datetime.datetime.utcnow()))
+        self.log_file.write("{0} System shutdown\n".format(datetime.datetime.utcnow()))
         log_file.close()
 
     '''Detect system hangup'''
     def ignore(self, sig, frame):
         print('ignoring signal %d\n' % sig)
-        self.log_file.write("Ignore signal {0}\n".format(datetime.datetime.utcnow()))
+        self.log_file.write("{0} Ignore signal\n".format(datetime.datetime.utcnow()))
 
     '''readConfig looks at the defaults.cfg file.'''
     def readconfig(self):
@@ -70,8 +76,7 @@ class Controller(object):
         'Main run loop that processes commands and records sensor data'
         print('Running...')
         self.log_file.write("=============================================\n")
-
-        self.log_file.write("Starting main loop {0}\n".format(datetime.datetime.utcnow()))
+        self.log_file.write("{0} Starting telemetry capture\n".format(datetime.datetime.utcnow()))
 
         if self.camera_present:
             self.camera.start_video(self.video_path)
@@ -79,15 +84,20 @@ class Controller(object):
         if self.enviro_present:
             sea_level = weather.altitude()
         else:
-            sea_level = 0
+            sea_level = 0.0
 
         self.log_file.write("Sea level          {0}\n".format(sea_level))
 
-        last_altitude = 0
         start_clock = False
         parachute_deployed = False
         hit_apogee = False
         timer = 0
+        max_altitude = 0.0
+        max_acc_x = 0.0
+        max_acc_y = 0.0
+        max_acc_z = 0.0
+        parachute_deployed_at = 0
+        apogee_reached_at = 0
 
         self.log_file.write("=============================================\n")
         self.log_file.write("time,altitude,accel_x,accel_y,accel_z\n")
@@ -97,33 +107,42 @@ class Controller(object):
                 altitude = weather.altitude()
                 acc_values = [round(x, 2) for x in motion.accelerometer()]
 
-                try:
-                    self.log_file.write("{0},{1},{2},{3},{4}\n".format(datetime.datetime.utcnow(),
-                                                                       str(altitude - sea_level),
-                                                                       str(acc_values[0]),
-                                                                       str(acc_values[1]),
-                                                                       str(acc_values[2])))
-                    self.log_file.flush()
-                except:
-                    print('logging failed')
+                if acc_values[0] > max_acc_x:
+                    max_acc_x = acc_values[0]
+                if acc_values[1] > max_acc_y:
+                    max_acc_y = acc_values[1]
+                if acc_values[2] > max_acc_z:
+                    max_acc_z = acc_values[2]
 
-                # Start the clock once we pass 10 metres
-                if start_clock == False and altitude - sea_level > 3:
-                    print('Starting clock')
-                    start_clock = True
+            try:
+                self.log_file.write("{0},{1},{2},{3},{4}\n".format(datetime.datetime.utcnow(),
+                                                                   str(altitude - sea_level),
+                                                                   str(acc_values[0]),
+                                                                   str(acc_values[1]),
+                                                                   str(acc_values[2])))
+                self.log_file.flush()
+            except:
+                print('logging failed')
 
-                # If the height is greater than 10m then start running this check.
-                if not hit_apogee and last_altitude < altitude and start_clock:
-                    # Our maximum altitude
-                    hit_apogee = True
-                    print('Apogee')
+            # Start the clock once we pass 10 metres
+            if start_clock == False and altitude - sea_level > self.safe_start_altitude:
+                print('Starting clock')
+                start_clock = True
 
-                # Returning to earth...
-                if hit_apogee and altitude <= 90 and not parachute_deployed:
-                    parachute_deployed = True
-                    print('Deploy parachute')
+            if altitude > max_altitude:
+                max_altitude = altitude
 
-                last_altitude = altitude
+            if altitude - 1.0 < max_altitude and not hit_apogee:
+                # Our maximum altitude - 1 metre
+                hit_apogee = True
+                apogee_reached_at = datetime.datetime.utcnow()
+                print('Apogee: ' + str(max_altitude) + ' metres')
+
+            # Is it time to deploy a secondary parachute?
+            if hit_apogee and altitude <= self.parachute_deply_altitude and not parachute_deployed:
+                parachute_deployed = True
+                parachute_deployed_at = datetime.datetime.utcnow()
+                print('Deploy secondary parachute')
 
             time.sleep(self.sampleInterval)
 
@@ -133,9 +152,19 @@ class Controller(object):
                 print('Timer: ' + str(timer) + ' of ' + str(self.cutoffTime))
 
                 if timer > self.cutoffTime:
+                    self.log_file.write("=============================================\n")
+                    self.log_file.write("{0} Auto shutdown\n".format(datetime.datetime.utcnow()))
+                    self.log_file.write("{0} Max altitude: {1}\n".format(datetime.datetime.utcnow(), max_altitude))
+                    self.log_file.write("{0} Apogee at: {1}\n".format(datetime.datetime.utcnow(), apogee_reached_at))
+                    self.log_file.write("{0} Max acceleration: x{1} y{2} z{3}\n".format(datetime.datetime.utcnow(), max_acc_x, max_acc_y, max_acc_z))
+
+                    if parachute_deployed_at > 0:
+                        self.log_file.write("{0} Secondary parachute deployed at {1}\n".format(datetime.datetime.utcnow(), parachute_deployed_at))
+
                     if self.camera_present:
-                        self.log_file.write("Auto shutdown... {0}\n".format(datetime.datetime.utcnow()))
+                        self.log_file.write("{0} Shutdown camera...\n".format(datetime.datetime.utcnow()))
                         self.camera.stop_video()
 
+                    self.log_file.write("=============================================\n")
                     self.log_file.close()
                     self.running = False
