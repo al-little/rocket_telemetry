@@ -1,4 +1,4 @@
-import os
+
 import configparser
 import datetime
 import time
@@ -33,8 +33,8 @@ class Controller(object):
         self.log_file.write("{0} image_path {1}\n".format(datetime.datetime.utcnow(), self.image_path))
         self.log_file.write("{0} video_path {1}\n".format(datetime.datetime.utcnow(), self.video_path))
         self.log_file.write("{0} log_path {1}\n".format(datetime.datetime.utcnow(), self.log_path))
-        self.log_file.write("{0} Camera present {1}}\n".format(datetime.datetime.utcnow(), self.camera_present))
-        self.log_file.write("{0} Enviro present {1}}\n".format(datetime.datetime.utcnow(), self.enviro_present))
+        self.log_file.write("{0} Camera present {1}\n".format(datetime.datetime.utcnow(), self.camera_present))
+        self.log_file.write("{0} Enviro present {1}\n".format(datetime.datetime.utcnow(), self.enviro_present))
 
         if self.camera_present:
             self.log_file.write("{0} Starting camera\n".format(datetime.datetime.utcnow()))
@@ -96,8 +96,8 @@ class Controller(object):
         max_acc_x = 0.0
         max_acc_y = 0.0
         max_acc_z = 0.0
-        parachute_deployed_at = 0
-        apogee_reached_at = 0
+        parachute_deployed_at = None
+        apogee_reached_at = None 
 
         self.log_file.write("=============================================\n")
         self.log_file.write("time,altitude,accel_x,accel_y,accel_z\n")
@@ -132,7 +132,7 @@ class Controller(object):
             if altitude > max_altitude:
                 max_altitude = altitude
 
-            if altitude - 1.0 < max_altitude and not hit_apogee:
+            if start_clock and altitude < max_altitude - 1 and not hit_apogee:
                 # Our maximum altitude - 1 metre
                 hit_apogee = True
                 apogee_reached_at = datetime.datetime.utcnow()
@@ -154,11 +154,12 @@ class Controller(object):
                 if timer > self.cutoffTime:
                     self.log_file.write("=============================================\n")
                     self.log_file.write("{0} Auto shutdown\n".format(datetime.datetime.utcnow()))
-                    self.log_file.write("{0} Max altitude: {1}\n".format(datetime.datetime.utcnow(), max_altitude))
-                    self.log_file.write("{0} Apogee at: {1}\n".format(datetime.datetime.utcnow(), apogee_reached_at))
+                    self.log_file.write("{0} Max altitude: {1}\n".format(datetime.datetime.utcnow(), max_altitude - sea_level))
+                    if not apogee_reached_at is None:
+                        self.log_file.write("{0} Apogee at: {1}\n".format(datetime.datetime.utcnow(), apogee_reached_at))
                     self.log_file.write("{0} Max acceleration: x{1} y{2} z{3}\n".format(datetime.datetime.utcnow(), max_acc_x, max_acc_y, max_acc_z))
 
-                    if parachute_deployed_at > 0:
+                    if not parachute_deployed_at is None:
                         self.log_file.write("{0} Secondary parachute deployed at {1}\n".format(datetime.datetime.utcnow(), parachute_deployed_at))
 
                     if self.camera_present:
